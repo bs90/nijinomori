@@ -667,7 +667,6 @@ function renderCurrentPage() {
     return;
   }
   const counts = countsForPage(currentPage);
-  const isTotal = currentPage === TOTAL_KEY;
   body.innerHTML = '';
   for (const c of sortChildren(counts)) {
     const n = counts.get(c) || 0;
