@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>卒業アルバム写真選択ツール</title>
+<style>
+  :root {
+    --bg: #faf7f2;
+    --panel: #ffffff;
+    --border: #e3ddd2;
+    --text: #2d2a26;
+    --muted: #888278;
+    --accent: #d97757;
+    --accent-soft: #f5e6dd;
+    --ok: #5b9f6a;
+    --danger: #c0524a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  header {
+    padding: 12px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  header .conn { font-size: 12px; color: var(--muted); }
+  header .conn .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ccc; margin-right: 4px; vertical-align: middle; }
+  header .conn.ok .dot { background: var(--ok); }
+  header .conn.err .dot { background: var(--danger); }
+
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  button:hover { opacity: 0.9; }
+  button.secondary { background: var(--panel); color: var(--text); border: 1px solid var(--border); }
+  button.danger { background: var(--danger); }
+  button.small { padding: 3px 8px; font-size: 12px; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  main {
+    display: grid;
+    grid-template-columns: 320px minmax(260px, 1fr) 620px;
+    gap: 16px;
+    padding: 16px 20px;
+    align-items: start;
+  }
+  @media (max-width: 1400px) {
+    main { grid-template-columns: 280px minmax(220px, 1fr) 560px; }
+  }
+  @media (max-width: 1000px) {
+    main { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+  }
+  .panel h2 {
+    margin: 0 0 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .panel-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .panel-toolbar h2 { margin: 0; }
+  .sort-toggle { display: flex; gap: 4px; }
+  .sort-toggle button {
+    background: var(--panel);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 3px 10px;
+    font-size: 12px;
+    border-radius: 3px;
+  }
+  .sort-toggle button.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* Pages list */
+  .page-list { display: flex; flex-direction: column; gap: 4px; max-height: 70vh; overflow-y: auto; }
+  .page-item {
+    padding: 8px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+  .page-item > span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .page-item:hover { background: #f4efe7; }
+  .page-item.active { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
+  .page-item .count {
+    font-size: 11px;
+    color: var(--muted);
+    background: #f0ebe2;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: 6px;
+  }
+  .page-item.active .count { background: white; color: var(--accent); }
+  .page-item.page-total {
+    font-weight: 600;
+    background: #f0ebe2;
+    margin-bottom: 6px;
+  }
+  .page-item.page-total.active { background: var(--accent-soft); }
+
+  /* Center summary */
+  .current-page-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .summary-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .summary-table th, .summary-table td {
+    text-align: left;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .summary-table th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  .summary-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .summary-table .row-zero td { color: #bbb; }
+  .summary-table tbody tr:hover { background: #fafaf7; }
+
+  .empty-msg { color: var(--muted); font-style: italic; padding: 20px 0; text-align: center; font-size: 13px; }
+
+  /* Children list — 2 columns */
+  .child-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .child-btn {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    text-align: left;
+    transition: all 0.1s;
+    white-space: nowrap;
+  }
+  .child-btn > span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .child-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
+  .child-btn:active { transform: scale(0.98); }
+  .child-btn .badge {
+    font-size: 11px;
+    background: var(--accent);
+    color: white;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+  .child-btn .badge.zero { background: #d8d2c6; color: white; }
+  .child-btn:disabled { background: #f5f5f5; cursor: not-allowed; }
+
+  .actions { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(45, 42, 38, 0.95);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 13px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .toast.show { opacity: 1; }
+
+  /* Password gate */
+  body.locked > *:not(#authOverlay) { display: none !important; }
+  #authOverlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  body.locked #authOverlay { display: flex; }
+  .auth-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 32px 28px;
+    max-width: 360px;
+    width: calc(100% - 40px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+  }
+  .auth-box h2 {
+    margin: 0 0 6px;
+    color: var(--text);
+    font-size: 18px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .auth-box p { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
+  .auth-box input[type=password] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 16px;
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+  .auth-box input[type=password]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .auth-row-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 10px 0 16px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .auth-row-check input { margin: 0; }
+  .auth-box button { width: 100%; padding: 10px; font-size: 14px; }
+  .auth-error {
+    color: var(--danger);
+    font-size: 13px;
+    margin-top: 10px;
+    min-height: 18px;
+  }
+
+</style>
+</head>
+<body class="locked">
+
+<div id="authOverlay">
+  <form class="auth-box" id="authForm">
+    <h2>卒業アルバム写真選択ツール</h2>
+    <p>パスワードを入力してください</p>
+    <input type="password" id="authInput" autocomplete="current-password" autofocus />
+    <button type="submit" style="margin-top: 16px;">ログイン</button>
+    <div class="auth-error" id="authError"></div>
+  </form>
+</div>
+
+<header>
+  <h1>卒業アルバム写真選択ツール</h1>
+  <div style="display: flex; align-items: center; gap: 14px;">
+    <span id="connStatus" class="conn"><span class="dot"></span><span class="text">未接続</span></span>
+    <button id="logoutBtn" class="secondary small">ログアウト</button>
+  </div>
+</header>
+
+<main>
+  <!-- Left: Pages list -->
+  <section class="panel">
+    <h2>ページ一覧</h2>
+    <div id="pageList" class="page-list"></div>
+  </section>
+
+  <!-- Center: Current page summary + global totals -->
+  <!-- Col 2: Current page summary -->
+  <section class="panel">
+    <div id="currentPageHeader" class="current-page-title">
+      <span id="currentPageName">ページを選択してください</span>
+      <button id="resetPageBtn" class="danger small" disabled>このページをリセット</button>
+    </div>
+    <div class="panel-toolbar" style="margin-top: 4px;">
+      <h2>このページの集計</h2>
+      <div class="sort-toggle">
+        <button id="sortByName" class="active">名前順</button>
+        <button id="sortByCount">回数順</button>
+      </div>
+    </div>
+    <table class="summary-table">
+      <thead>
+        <tr><th>子ども</th><th class="num">回数</th></tr>
+      </thead>
+      <tbody id="pageSummaryBody"></tbody>
+    </table>
+  </section>
+
+  <!-- Col 3: Children buttons (2-column grid) -->
+  <section class="panel panel-children">
+    <h2>子どもリスト（クリックで+1）</h2>
+    <div id="childList" class="child-list"></div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+// ========================================================================
+// EDIT HERE: list of children and pages
+// 子どもリストとページリストはここで編集してください
+// ========================================================================
+
+const CHILDREN = [
+  "ありあ (かとうありあ)",
+  "あすか (なかやまあすか)",
+  "いろは (ひだいろは)",
+  "かえで (とよしまかえで)",
+  "かほ (おくじかほ)",
+  "きな (かわさかきな)",
+  "きぬい (ごえぶちきぬい)",
+  "こうたろう (もりしたこうたろう)",
+  "ことは (くろきことは)",
+  "しゅんご (たかだしゅんご)",
+  "そう (まつながそう)",
+  "なむ (ちゃんばあなむ)",
+  "はるき (はしもとはるき)",
+  "ひかり (こじまひかり)",
+  "ひなの (にいやまひなの)",
+  "ひろと (ふじしまひろと)",
+  "みはる (いちかわみはる)",
+  "みはる (はがみはる)",
+  "めい (やぶきめい)",
+  "ゆうき (はやしゆうき)",
+  "ゆうま (さかばゆうま)",
+  "ゆうり (みかみゆうり)",
+  "ゆき (あおやまゆき)",
+  "よい (ちょうよい)",
+  "りつき (きくはらりつき)",
+  "りゅうと (いのうえりゅうと)",
+  "りゅうと (やまだりゅうと)",
+  "れいせい (たかぎれいせい)",
+];
+
+const PAGES = [
+  "1 2 - 個人写真 28名",
+  "3 4 - ひよこりすうさぎ",
+  "5 6 - ぺんぎんパンダ",
+  "7 8 - 遠足",
+  "9 10 - 夏の行事（夏祭り、そうめん）",
+  "11 12 - 運動会",
+  "13 14 - ハロウィン",
+  "15 16 - 生活発表会",
+  "17 18 - お買い物ごっこ",
+  "19 20 - お別れ遠足",
+  "21 22 - 卒園式",
+  "23 24 - 卒園式",
+];
+
+// ========================================================================
+
+const TABLE = 'nijinomori_selections';
+const TOTAL_KEY = '__TOTAL__';
+const TOTAL_LABEL = '全体（全ページ合計）';
+
+const AUTH_EMAIL = 'trongtb90@gmail.com';
+const SUPABASE_URL = 'https://wszkegbvbfpivinwkjwj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzemtlZ2J2YmZwaXZpbndrandqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5OTA1NDIsImV4cCI6MjA5NDU2NjU0Mn0.qFAvbHfsnN0XlI7jQZDA7Bc64U8l5YZZKMblCh9pNR4';
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+let selections = []; // [{id, page_name, child_name}]
+let currentPage = null;
+let sortMode = 'name'; // 'name' | 'count'
+
+const $ = (id) => document.getElementById(id);
+
+function toast(msg, ms = 1500) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+function setConn(state, text) {
+  const el = $('connStatus');
+  el.className = 'conn ' + state;
+  el.querySelector('.text').textContent = text;
+}
+
+async function connect() {
+  try {
+    setConn('', '接続中...');
+    await refresh();
+    setConn('ok', '接続済み');
+  } catch (e) {
+    console.error(e);
+    setConn('err', '接続エラー');
+    toast('接続に失敗: ' + e.message);
+  }
+}
+
+// ---- Data ----
+async function refresh() {
+  if (!supabase) return;
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select('id, page_name, child_name');
+  if (error) {
+    setConn('err', 'エラー');
+    toast('読み込み失敗: ' + error.message);
+    return;
+  }
+  selections = data || [];
+  render();
+}
+
+async function addSelection(child) {
+  if (!supabase) { toast('Supabase未接続'); return; }
+  if (!currentPage) { toast('ページを選択してください'); return; }
+  const { data, error } = await supabase
+    .from(TABLE)
+    .insert({ page_name: currentPage, child_name: child })
+    .select()
+    .single();
+  if (error) { toast('追加失敗: ' + error.message); return; }
+  selections.push(data);
+  render();
+}
+
+async function resetPage() {
+  if (!supabase || !currentPage) return;
+  if (!confirm(`「${currentPage}」の集計をリセットしますか？`)) return;
+  const { error } = await supabase
+    .from(TABLE)
+    .delete()
+    .eq('page_name', currentPage);
+  if (error) { toast('リセット失敗: ' + error.message); return; }
+  selections = selections.filter(s => s.page_name !== currentPage);
+  toast('リセット完了');
+  render();
+}
+
+// ---- Render ----
+function countsForPage(page) {
+  const m = new Map(CHILDREN.map(c => [c, 0]));
+  for (const s of selections) {
+    const match = page === TOTAL_KEY ? true : s.page_name === page;
+    if (match && m.has(s.child_name)) {
+      m.set(s.child_name, m.get(s.child_name) + 1);
+    }
+  }
+  return m;
+}
+
+function pageTotalCount(page) {
+  if (page === TOTAL_KEY) return selections.length;
+  return selections.filter(s => s.page_name === page).length;
+}
+
+function sortChildren(counts) {
+  const arr = [...CHILDREN];
+  if (sortMode === 'count' && counts) {
+    arr.sort((a, b) => (counts.get(b) || 0) - (counts.get(a) || 0)
+                       || a.localeCompare(b, 'ja'));
+  }
+  return arr;
+}
+
+function renderPageList() {
+  const el = $('pageList');
+  el.innerHTML = '';
+  const entries = [{ key: TOTAL_KEY, label: TOTAL_LABEL, isTotal: true }]
+    .concat(PAGES.map(p => ({ key: p, label: p, isTotal: false })));
+  for (const { key, label, isTotal } of entries) {
+    const div = document.createElement('div');
+    div.className = 'page-item' + (key === currentPage ? ' active' : '') + (isTotal ? ' page-total' : '');
+    const cnt = pageTotalCount(key);
+    div.innerHTML = `<span>${escapeHtml(label)}</span>${cnt ? `<span class="count">${cnt}</span>` : ''}`;
+    div.onclick = () => { currentPage = key; render(); };
+    el.appendChild(div);
+  }
+}
+
+function renderCurrentPage() {
+  const isTotal = currentPage === TOTAL_KEY;
+  $('currentPageName').textContent = !currentPage ? 'ページを選択してください'
+    : isTotal ? TOTAL_LABEL : currentPage;
+  $('resetPageBtn').disabled = !currentPage || isTotal;
+  const body = $('pageSummaryBody');
+  if (!currentPage) {
+    body.innerHTML = '<tr><td colspan="2" class="empty-msg">左側のページ一覧から選択してください</td></tr>';
+    return;
+  }
+  const counts = countsForPage(currentPage);
+  body.innerHTML = '';
+  for (const c of sortChildren(counts)) {
+    const n = counts.get(c) || 0;
+    const tr = document.createElement('tr');
+    if (n === 0) tr.className = 'row-zero';
+    tr.innerHTML = `<td>${escapeHtml(c)}</td><td class="num">${n} 回</td>`;
+    body.appendChild(tr);
+  }
+}
+
+function renderChildren() {
+  const el = $('childList');
+  el.innerHTML = '';
+  const isTotal = currentPage === TOTAL_KEY;
+  const pageCounts = currentPage ? countsForPage(currentPage) : null;
+  for (const c of CHILDREN) {
+    const btn = document.createElement('button');
+    btn.className = 'child-btn';
+    btn.disabled = !currentPage || isTotal;
+    const n = pageCounts ? (pageCounts.get(c) || 0) : 0;
+    btn.innerHTML = `<span>${escapeHtml(c)}</span><span class="badge${n === 0 ? ' zero' : ''}">${n}</span>`;
+    btn.onclick = () => addSelection(c);
+    el.appendChild(btn);
+  }
+}
+
+function render() {
+  renderPageList();
+  renderCurrentPage();
+  renderChildren();
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ---- Auth (Supabase) ----
+function unlock() {
+  document.body.classList.remove('locked');
+}
+
+$('authForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const password = $('authInput').value;
+  const submitBtn = $('authForm').querySelector('button[type=submit]');
+  submitBtn.disabled = true;
+  $('authError').textContent = '';
+  const { error } = await supabase.auth.signInWithPassword({
+    email: AUTH_EMAIL,
+    password,
+  });
+  submitBtn.disabled = false;
+  if (error) {
+    $('authError').textContent = error.message.includes('Invalid')
+      ? 'パスワードが違います'
+      : 'ログインエラー: ' + error.message;
+    $('authInput').select();
+    return;
+  }
+  unlock();
+  boot();
+});
+
+// ---- Init ----
+$('resetPageBtn').onclick = resetPage;
+$('logoutBtn').onclick = async () => {
+  await supabase.auth.signOut();
+  location.reload();
+};
+$('sortByName').onclick = () => {
+  sortMode = 'name';
+  $('sortByName').classList.add('active');
+  $('sortByCount').classList.remove('active');
+  renderCurrentPage();
+};
+$('sortByCount').onclick = () => {
+  sortMode = 'count';
+  $('sortByCount').classList.add('active');
+  $('sortByName').classList.remove('active');
+  renderCurrentPage();
+};
+
+let booted = false;
+function boot() {
+  if (booted) return;
+  booted = true;
+  render();
+  connect();
+}
+
+// Check existing session on load
+(async () => {
+  const { data } = await supabase.auth.getSession();
+  if (data?.session) {
+    unlock();
+    boot();
+  }
+})();
+</script>
+</body>
+</html>
