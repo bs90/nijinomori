@@ -507,10 +507,10 @@
   .collapse-btn:hover { color: var(--accent); border-color: var(--accent); }
   .collapse-btn i { transition: transform 0.2s; }
   .panel-summary.collapsed .collapse-btn i { transform: rotate(-180deg); }
-  .panel-summary.collapsed .panel-toolbar,
-  .panel-summary.collapsed .summary-table { display: none; }
   @media (max-width: 1000px) {
     .collapse-btn { display: inline-flex; align-items: center; gap: 6px; }
+    .panel-summary.collapsed .panel-toolbar,
+    .panel-summary.collapsed .summary-table { display: none; }
   }
 
   /* Removable row (col 2 click to -1) */
@@ -617,7 +617,7 @@
 
   <!-- Center: Current page summary + global totals -->
   <!-- Col 2: Current page summary -->
-  <section class="panel panel-summary" id="summaryPanel">
+  <section class="panel panel-summary collapsed" id="summaryPanel">
     <div id="currentPageHeader" class="current-page-title">
       <span id="currentPageName">ページを選択してください</span>
       <div style="display: flex; gap: 6px; align-items: center;">
