@@ -366,10 +366,10 @@
     padding: 4px 8px;
   }
   .modal .close-btn:hover { color: var(--danger); }
-  .modal .sp-only { display: none; }
+  .sp-only { display: none; }
   @media (max-width: 1000px) {
-    .modal .pc-only { display: none; }
-    .modal .sp-only { display: revert; }
+    .pc-only { display: none !important; }
+    .sp-only { display: revert; }
   }
   .modal .kbd {
     display: inline-block;
@@ -624,7 +624,7 @@
         <button id="collapseBtn" class="collapse-btn" title="集計の表示／非表示">
           <i class="fa-solid fa-chevron-up"></i>
         </button>
-        <button id="resetPageBtn" class="danger small" disabled>このページをリセット</button>
+        <button id="resetPageBtn" class="danger small" disabled><span class="pc-only">このページを</span>リセット</button>
       </div>
     </div>
     <div class="panel-toolbar" style="margin-top: 4px;">
@@ -644,7 +644,7 @@
 
   <!-- Col 3: Children buttons (2-column grid) -->
   <section class="panel panel-children">
-    <h2>子どもリスト（クリックで +1 ／ 中央の表クリックで −1）</h2>
+    <h2>子どもリスト（<span class="pc-only">クリックで +1 ／ 中央の表クリックで −1</span><span class="sp-only">タップで +1 ／ 上の表のタップで −1</span>）</h2>
     <div id="childList" class="child-list"></div>
   </section>
 </main>
@@ -858,7 +858,7 @@ function renderCurrentPage() {
   $('resetPageBtn').disabled = !currentPage || isTotal;
   const body = $('pageSummaryBody');
   if (!currentPage) {
-    body.innerHTML = '<tr><td colspan="2" class="empty-msg">左側のページ一覧から選択してください</td></tr>';
+    body.innerHTML = '<tr><td colspan="2" class="empty-msg"><span class="pc-only">左側のページ一覧から選択してください</span><span class="sp-only">左上の ☰ ボタンからページを選択してください</span></td></tr>';
     return;
   }
   const counts = countsForPage(currentPage);
