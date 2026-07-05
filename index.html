@@ -127,6 +127,11 @@
     border-color: var(--accent);
     font-weight: 600;
   }
+  .sort-toggle button.good.active {
+    background: #e8f3ea;
+    color: var(--ok);
+    border-color: var(--ok);
+  }
 
   /* Pages list */
   .page-list { display: flex; flex-direction: column; gap: 4px; max-height: 70vh; overflow-y: auto; }
@@ -681,6 +686,7 @@
       <div class="sort-toggle">
         <button id="sortByName" class="active">名前順</button>
         <button id="sortByCount">回数順</button>
+        <button id="sortByGood" class="good">◎順</button>
       </div>
     </div>
     <table class="summary-table">
@@ -888,11 +894,9 @@ function pageTotals(page) {
 
 function sortChildren(counts) {
   const arr = [...CHILDREN];
-  if (sortMode === 'count' && counts) {
-    const val = (c) => {
-      const rec = counts.get(c) || { normal: 0, good: 0 };
-      return countMode === 'good' ? rec.good : rec.normal;
-    };
+  if (sortMode !== 'name' && counts) {
+    const key = sortMode === 'good' ? 'good' : 'normal';
+    const val = (c) => (counts.get(c) || { normal: 0, good: 0 })[key];
     arr.sort((a, b) => (val(b) - val(a)) || a.localeCompare(b, 'ja'));
   }
   return arr;
@@ -1035,18 +1039,16 @@ $('logoutBtn').onclick = async () => {
   await supabase.auth.signOut();
   location.reload();
 };
-$('sortByName').onclick = () => {
-  sortMode = 'name';
-  $('sortByName').classList.add('active');
-  $('sortByCount').classList.remove('active');
+function setSortMode(m) {
+  sortMode = m;
+  $('sortByName').classList.toggle('active', m === 'name');
+  $('sortByCount').classList.toggle('active', m === 'count');
+  $('sortByGood').classList.toggle('active', m === 'good');
   renderCurrentPage();
-};
-$('sortByCount').onclick = () => {
-  sortMode = 'count';
-  $('sortByCount').classList.add('active');
-  $('sortByName').classList.remove('active');
-  renderCurrentPage();
-};
+}
+$('sortByName').onclick = () => setSortMode('name');
+$('sortByCount').onclick = () => setSortMode('count');
+$('sortByGood').onclick = () => setSortMode('good');
 
 // ---- Count mode (通常 / ◎ 良い顔) ----
 function updateModeHint() {
