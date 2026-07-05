@@ -157,6 +157,13 @@
     margin-left: 6px;
   }
   .page-item.active .count { background: white; color: var(--accent); }
+  .count-group { display: inline-flex; gap: 4px; align-items: center; flex-shrink: 0; }
+  .page-item .count.good { background: var(--ok); color: white; }
+  .page-item.active .count.good { background: white; color: var(--ok); }
+  .page-item .count.zero { background: #ece6db; color: #b7b0a4; }
+  .page-item .count.good.zero { background: #dfe9e1; color: #97b19d; }
+  .page-item.active .count.zero { background: #fff; color: #c9b8ad; }
+  .page-item.active .count.good.zero { background: #fff; color: #a9c2af; }
   .page-item.page-total {
     font-weight: 600;
     background: #f0ebe2;
@@ -871,10 +878,12 @@ function countsForPage(page) {
   return m;
 }
 
-// Page list count = 従来の「通常」カウントのみ（primary metric）
-function pageTotalCount(page) {
+// Page list totals: 通常 と ◎良い顔 の両方
+function pageTotals(page) {
   const rows = page === TOTAL_KEY ? selections : selections.filter(s => s.page_name === page);
-  return rows.reduce((n, s) => n + (kindOf(s) === 'normal' ? 1 : 0), 0);
+  const t = { normal: 0, good: 0 };
+  for (const s of rows) t[kindOf(s)]++;
+  return t;
 }
 
 function sortChildren(counts) {
@@ -897,8 +906,10 @@ function renderPageList() {
   for (const { key, label, isTotal } of entries) {
     const div = document.createElement('div');
     div.className = 'page-item' + (key === currentPage ? ' active' : '') + (isTotal ? ' page-total' : '');
-    const cnt = pageTotalCount(key);
-    div.innerHTML = `<span>${escapeHtml(label)}</span>${cnt ? `<span class="count">${cnt}</span>` : ''}`;
+    const t = pageTotals(key);
+    const badges = `<span class="count${t.normal === 0 ? ' zero' : ''}">${t.normal}</span>`
+      + `<span class="count good${t.good === 0 ? ' zero' : ''}">◎${t.good}</span>`;
+    div.innerHTML = `<span>${escapeHtml(label)}</span><span class="count-group">${badges}</span>`;
     div.onclick = () => {
       currentPage = key;
       if (isMobile()) closeDrawer();
