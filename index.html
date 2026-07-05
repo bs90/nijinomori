@@ -526,6 +526,41 @@
   }
   .summary-table tbody tr.removable:hover td:first-child::before { opacity: 1; }
 
+  /* ---- Count mode toggle (通常 / ◎ 良い顔) ---- */
+  .mode-toggle { display: flex; gap: 4px; }
+  .mode-toggle button {
+    background: var(--panel);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 3px 12px;
+    font-size: 12px;
+    border-radius: 3px;
+  }
+  .mode-toggle button.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .mode-toggle button.good.active {
+    background: #e8f3ea;
+    color: var(--ok);
+    border-color: var(--ok);
+  }
+  .mode-hint { font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+  body.good-mode .mode-hint { color: var(--ok); }
+
+  /* Green (good) count badge + number */
+  .child-btn .badges { display: inline-flex; gap: 4px; align-items: center; }
+  .child-btn .badge.good { background: var(--ok); }
+  .child-btn .badge.good.zero { background: #cfe3d4; }
+  body.good-mode .child-btn:hover { background: #e8f3ea; border-color: var(--ok); }
+  .summary-table .good-num { color: var(--ok); font-weight: 600; margin-left: 6px; }
+
+  /* Removable marker turns green while in good mode */
+  body.good-mode .summary-table tbody tr.removable:hover { background: #eef7f0; }
+  body.good-mode .summary-table tbody tr.removable td:first-child::before { color: var(--ok); }
+
 </style>
 </head>
 <body class="locked">
@@ -578,6 +613,13 @@
     <h3>カウントを 1 減らしたいとき</h3>
     <p>
       「このページの集計」の表で、減らしたい子の<strong>名前の行を<span class="pc-only">クリック</span><span class="sp-only">タップ</span></strong>すると、そのページのカウントが <strong>−1</strong> されます<span class="pc-only">（行の上にマウスを置くと「−」マークが表示されます）</span>。
+    </p>
+
+    <h3>◎ 良い顔モード（もう一つのカウント）</h3>
+    <p>
+      子どもリスト上の <strong>「通常 / ◎ 良い顔」</strong> の切り替えで、カウントの種類を選べます。
+      <strong>◎ 良い顔</strong>に切り替えると、正面・センターに写った「特に良い写真」だけを別で数えられます
+      （通常カウントとは<strong>完全に独立</strong>）。この数は各所で<span style="color: var(--ok); font-weight: 600;">緑色</span>で表示され、通常の回数の横に並びます。<span class="pc-only">−1 したいときは、そのモードのまま集計表の行をクリックします。</span>
     </p>
 
     <h3>全体の合計を見る</h3>
@@ -644,7 +686,14 @@
 
   <!-- Col 3: Children buttons (2-column grid) -->
   <section class="panel panel-children">
-    <h2>子どもリスト（<span class="pc-only">クリックで +1 ／ 中央の表クリックで −1</span><span class="sp-only">タップで +1 ／ 上の表のタップで −1</span>）</h2>
+    <div class="panel-toolbar">
+      <h2>子どもリスト</h2>
+      <div class="mode-toggle">
+        <button id="modeNormal" class="active" title="全出演をカウント">通常</button>
+        <button id="modeGood" class="good" title="正面・センターの良い写真だけをカウント">◎ 良い顔</button>
+      </div>
+    </div>
+    <p class="mode-hint" id="modeHint"></p>
     <div id="childList" class="child-list"></div>
   </section>
 </main>
@@ -716,9 +765,10 @@ const SUPABASE_URL = 'https://wszkegbvbfpivinwkjwj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzemtlZ2J2YmZwaXZpbndrandqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5OTA1NDIsImV4cCI6MjA5NDU2NjU0Mn0.qFAvbHfsnN0XlI7jQZDA7Bc64U8l5YZZKMblCh9pNR4';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-let selections = []; // [{id, page_name, child_name}]
+let selections = []; // [{id, page_name, child_name, kind}]
 let currentPage = null;
 let sortMode = 'name'; // 'name' | 'count'
+let countMode = 'normal'; // 'normal' (全出演) | 'good' (◎良い顔) — 独立したカウント
 
 const $ = (id) => document.getElementById(id);
 
@@ -753,7 +803,7 @@ async function refresh() {
   if (!supabase) return;
   const { data, error } = await supabase
     .from(TABLE)
-    .select('id, page_name, child_name');
+    .select('id, page_name, child_name, kind');
   if (error) {
     setConn('err', 'エラー');
     toast('読み込み失敗: ' + error.message);
@@ -768,7 +818,7 @@ async function addSelection(child) {
   if (!currentPage) { toast('ページを選択してください'); return; }
   const { data, error } = await supabase
     .from(TABLE)
-    .insert({ page_name: currentPage, child_name: child })
+    .insert({ page_name: currentPage, child_name: child, kind: countMode })
     .select()
     .single();
   if (error) { toast('追加失敗: ' + error.message); return; }
@@ -778,11 +828,12 @@ async function addSelection(child) {
 
 async function removeSelection(child) {
   if (!supabase || !currentPage || currentPage === TOTAL_KEY) return;
-  // Find latest matching selection locally and delete by id
+  // Find latest matching selection (same kind as current mode) and delete by id
   let match = null;
   for (let i = selections.length - 1; i >= 0; i--) {
-    if (selections[i].page_name === currentPage && selections[i].child_name === child) {
-      match = selections[i];
+    const s = selections[i];
+    if (s.page_name === currentPage && s.child_name === child && kindOf(s) === countMode) {
+      match = s;
       break;
     }
   }
@@ -807,27 +858,33 @@ async function resetPage() {
 }
 
 // ---- Render ----
+const kindOf = (s) => s.kind === 'good' ? 'good' : 'normal';
+
 function countsForPage(page) {
-  const m = new Map(CHILDREN.map(c => [c, 0]));
+  const m = new Map(CHILDREN.map(c => [c, { normal: 0, good: 0 }]));
   for (const s of selections) {
     const match = page === TOTAL_KEY ? true : s.page_name === page;
     if (match && m.has(s.child_name)) {
-      m.set(s.child_name, m.get(s.child_name) + 1);
+      m.get(s.child_name)[kindOf(s)]++;
     }
   }
   return m;
 }
 
+// Page list count = 従来の「通常」カウントのみ（primary metric）
 function pageTotalCount(page) {
-  if (page === TOTAL_KEY) return selections.length;
-  return selections.filter(s => s.page_name === page).length;
+  const rows = page === TOTAL_KEY ? selections : selections.filter(s => s.page_name === page);
+  return rows.reduce((n, s) => n + (kindOf(s) === 'normal' ? 1 : 0), 0);
 }
 
 function sortChildren(counts) {
   const arr = [...CHILDREN];
   if (sortMode === 'count' && counts) {
-    arr.sort((a, b) => (counts.get(b) || 0) - (counts.get(a) || 0)
-                       || a.localeCompare(b, 'ja'));
+    const val = (c) => {
+      const rec = counts.get(c) || { normal: 0, good: 0 };
+      return countMode === 'good' ? rec.good : rec.normal;
+    };
+    arr.sort((a, b) => (val(b) - val(a)) || a.localeCompare(b, 'ja'));
   }
   return arr;
 }
@@ -864,15 +921,18 @@ function renderCurrentPage() {
   const counts = countsForPage(currentPage);
   body.innerHTML = '';
   for (const c of sortChildren(counts)) {
-    const n = counts.get(c) || 0;
+    const rec = counts.get(c) || { normal: 0, good: 0 };
+    const n = rec.normal, g = rec.good;
+    const activeCount = countMode === 'good' ? g : n;
     const tr = document.createElement('tr');
     const classes = [];
-    if (n === 0) classes.push('row-zero');
-    if (!isTotal && n > 0) classes.push('removable');
+    if (n === 0 && g === 0) classes.push('row-zero');
+    if (!isTotal && activeCount > 0) classes.push('removable');
     if (classes.length) tr.className = classes.join(' ');
-    tr.innerHTML = `<td>${escapeHtml(c)}</td><td class="num">${n} 回</td>`;
-    if (!isTotal && n > 0) {
-      tr.title = 'クリックで -1';
+    const goodHtml = g > 0 ? ` <span class="good-num">◎${g}</span>` : '';
+    tr.innerHTML = `<td>${escapeHtml(c)}</td><td class="num">${n} 回${goodHtml}</td>`;
+    if (!isTotal && activeCount > 0) {
+      tr.title = countMode === 'good' ? 'クリックで ◎ -1' : 'クリックで -1';
       tr.onclick = () => removeSelection(c);
     }
     body.appendChild(tr);
@@ -888,8 +948,11 @@ function renderChildren() {
     const btn = document.createElement('button');
     btn.className = 'child-btn';
     btn.disabled = !currentPage || isTotal;
-    const n = pageCounts ? (pageCounts.get(c) || 0) : 0;
-    btn.innerHTML = `<span>${escapeHtml(c)}</span><span class="badge${n === 0 ? ' zero' : ''}">${n}</span>`;
+    const rec = pageCounts ? (pageCounts.get(c) || { normal: 0, good: 0 }) : { normal: 0, good: 0 };
+    const n = rec.normal, g = rec.good;
+    btn.innerHTML = `<span>${escapeHtml(c)}</span><span class="badges">`
+      + `<span class="badge${n === 0 ? ' zero' : ''}">${n}</span>`
+      + `<span class="badge good${g === 0 ? ' zero' : ''}">${g}</span></span>`;
     btn.onclick = () => addSelection(c);
     el.appendChild(btn);
   }
@@ -973,6 +1036,24 @@ $('sortByCount').onclick = () => {
   $('sortByName').classList.remove('active');
   renderCurrentPage();
 };
+
+// ---- Count mode (通常 / ◎ 良い顔) ----
+function updateModeHint() {
+  $('modeHint').innerHTML = countMode === 'good'
+    ? '◎ <strong>良い顔モード</strong>：正面・センターの良い写真だけを +1（通常カウントとは別集計）'
+    : '通常モード：全出演を +1';
+}
+function setCountMode(m) {
+  countMode = m;
+  $('modeNormal').classList.toggle('active', m === 'normal');
+  $('modeGood').classList.toggle('active', m === 'good');
+  document.body.classList.toggle('good-mode', m === 'good');
+  updateModeHint();
+  render();
+}
+$('modeNormal').onclick = () => setCountMode('normal');
+$('modeGood').onclick = () => setCountMode('good');
+updateModeHint();
 
 let booted = false;
 function boot() {

@@ -8,8 +8,12 @@ create table if not exists nijinomori_selections (
   created_at timestamptz default now()
 );
 
+-- Count kind: 'normal' = 従来のカウント（全出演）, 'good' = ◎良い顔（正面・センター）
+alter table nijinomori_selections add column if not exists kind text not null default 'normal';
+
 create index if not exists idx_nijinomori_selections_page on nijinomori_selections(page_name);
 create index if not exists idx_nijinomori_selections_child on nijinomori_selections(child_name);
+create index if not exists idx_nijinomori_selections_kind on nijinomori_selections(kind);
 
 alter table nijinomori_selections enable row level security;
 
